@@ -1,14 +1,29 @@
 package aovddfhfpjtmqids.book.appmk.com.sonnikviewpager;
 
+import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
+import android.print.PrintAttributes;
 import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutCompat;
+import android.support.v7.widget.SearchView;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import com.astuetz.PagerSlidingTabStrip;
@@ -20,7 +35,9 @@ import com.backendless.persistence.BackendlessDataQuery;
 import com.backendless.persistence.QueryOptions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import static aovddfhfpjtmqids.book.appmk.com.sonnikviewpager.SonsAdapter.CONTENT;
 
@@ -31,99 +48,103 @@ public class MainActivity extends AppCompatActivity {
     private ViewPager mViewPager;
     private PagerSlidingTabStrip tabs;
     private ArrayList<String> sons;
+    private String mToFindText;
+    private LinearLayout activity_main;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        activity_main = (LinearLayout) findViewById(R.id.activity_main);
+        activity_main.setOnTouchListener(new View.OnTouchListener()
+        {
+            @Override
+            public boolean onTouch(View view, MotionEvent ev)
+            {
+                hideKeyboard(view);
+                return false;
+            }
+        });
         Backendless.initApp(this, Konst.APP_ID,Konst.ANDROID_KEY,"v1");
 
         mSonEditText = (EditText) findViewById(R.id.sonEditText);
-        mFindButton = (Button) findViewById(R.id.findButton);
+
         mViewPager = (ViewPager) findViewById(R.id.viewPager);
+        mViewPager.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                hideKeyboard(v);
+                return false;
+            }
+        });
 
         // Bind the tabs to the ViewPager
         tabs = (PagerSlidingTabStrip) findViewById(R.id.tabs);
-        tabs.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+        mSonEditText.setOnKeyListener(new View.OnKeyListener() {
             @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-
-            }
-
-            @Override
-            public void onPageSelected(int position) {
-
-                Log.d("myLog",CONTENT[position]);
-                downloadSons(position);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-
-            }
-        });
-
-
-        mFindButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onFindButtonClick();
-            }
-        });
-
-        downloadSons(0);
-    }
-
-    private void downloadSons(int position) {
-
-        String whereClause = "title LIKE '"+CONTENT[position]+"%'";
-
-        QueryOptions queryOptions = new QueryOptions();
-        List<String> sortBy = new ArrayList<String>();
-        sortBy.add( "title" );
-        queryOptions.setSortBy( sortBy );
-
-        BackendlessDataQuery query = new BackendlessDataQuery();
-        query.setPageSize(50);
-        query.setWhereClause(whereClause);
-        query.setQueryOptions( queryOptions );
-
-        Backendless.Persistence.of(Sons.class).find(query,new AsyncCallback<BackendlessCollection<Sons>>() {
-
-            @Override
-            public void handleResponse(BackendlessCollection<Sons> response) {
-                //Log.d("my_log",response+" my response is");
-                sons = new ArrayList<>();
-                for (int i=0; i<response.getData().size();i++){
-                    String son = response.getData().get(i).getTitle();
-                    sons.add(son);
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_ENTER) {
+                    InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(mSonEditText.getWindowToken(), 0);
+                    return true;
                 }
-                displaySons();
+                return MainActivity.super.onKeyDown(keyCode, event);
+            }
+        });
+        mSonEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
             }
 
             @Override
-            public void handleFault(BackendlessFault fault) {
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
 
+                if (!mSonEditText.getText().toString().equals("")) {
+                    Log.d("myLogh",mSonEditText.getText().toString().charAt(0)+"");
+                    char first = mSonEditText.getText().toString().charAt(0);
+                    String firstS = first+"";
+                    Log.d("myLogh",firstS.toUpperCase());
+                    Log.d("myLogh",Arrays.asList(CONTENT).indexOf(firstS.toUpperCase())+"");
+                    int pageNum = Arrays.asList(CONTENT).indexOf(firstS.toUpperCase());
+                    mViewPager.setCurrentItem(pageNum);
+                }
+            }
 
-                Log.e("my_log","some error "+ fault.getMessage());
+            @Override
+            public void afterTextChanged(Editable s) {
+
             }
         });
-    }
 
-    private void onFindButtonClick() {
-
-    }
-
-    private void displaySons() {
-
-        ArrayList<Fragment> fragments = new ArrayList<>();
-        for (String son: sons) {
-            fragments.add(SonFragment.newInstance(son));
-        }
-
-        SonsAdapter adapter = new SonsAdapter(getSupportFragmentManager(),fragments);
+        SonsAdapter adapter = new SonsAdapter(getSupportFragmentManager());
         mViewPager.setAdapter(adapter);
         tabs.setViewPager(mViewPager);
+    }
+
+
+    protected void setupParent(View view) {
+        //Set up touch listener for non-text box views to hide keyboard.
+        if(!(view instanceof EditText)) {
+            view.setOnTouchListener(new View.OnTouchListener() {
+                public boolean onTouch(View v, MotionEvent event) {
+                                        return false;
+                }
+            });
+        }
+        //If a layout container, iterate over children
+        if (view instanceof ViewGroup) {
+            for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
+                View innerView = ((ViewGroup) view).getChildAt(i);
+                setupParent(innerView);
+            }
+        }
+    }
+
+    protected void hideKeyboard(View view)
+    {
+        InputMethodManager in = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        in.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
     }
 }
